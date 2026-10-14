@@ -1,0 +1,9 @@
+// Decoration + auto-fit only - no game logic
+(()=>{
+const sc=document.getElementById('scene'),H=+sc.dataset.h;
+['🦁','🐘','🐅','🦅','🐂','🐎','🐍','🦚','🐒','🐄'].forEach((a,i)=>{
+  const d=document.createElement('div');d.className='deco';d.textContent=a;
+  d.style.transform=`rotate(${i*36+18}deg)`;document.getElementById('wheel').appendChild(d);});
+const fit=()=>{sc.style.transform=`translate(-50%,-50%) scale(${Math.min(innerWidth/1667,innerHeight/H)})`;};
+addEventListener('resize',fit);fit();
+})();

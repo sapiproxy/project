@@ -1,0 +1,38 @@
+*{margin:0;padding:0;box-sizing:border-box;font-family:Georgia,'Times New Roman',serif;font-weight:bold;user-select:none}
+html,body{height:100%;background:#000;overflow:hidden}
+body{margin:0}
+.scene{position:fixed;left:50%;top:50%;width:1667px;transform:translate(-50%,-50%) scale(var(--scene-scale,1));transform-origin:center;background:#000 url(bg.jpg) 0 0/1667px 638px no-repeat}
+.bandclip{position:absolute;inset:0;clip-path:path(evenodd,'M481 249 L481 286 L485 304 L492 322 L515 358 L533 377 L555 395 L564 395 L564 385 L561 379 L561 362 L566 355 L566 313 L589 312 L580 283 L580 253 L586 233 L602 206 L626 182 L661 159 L703 141 L746 129 L811 121 L849 121 L897 126 L935 134 L976 148 L999 159 L1025 175 L1045 192 L1058 206 L1068 221 L1076 238 L1080 253 L1081 274 L1078 292 L1071 308 L1071 312 L1097 313 L1097 382 L1107 382 L1112 386 L1117 386 L1124 379 L1124 369 L1136 368 L1149 353 L1161 335 L1171 315 L1178 291 L1180 274 L1179 249 L1175 232 L1159 197 L1133 165 L1097 135 L1043 105 L982 83 L917 69 L849 63 L777 65 L710 75 L652 91 L599 114 L556 140 L543 150 L517 176 L501 197 L492 214 Z')}
+.tilt{position:absolute;left:480px;top:-82px;width:700px;height:700px;transform:scaleY(.586)}
+.wheel{width:700px;height:700px;border-radius:50%;transition:transform 4s cubic-bezier(.2,.8,.2,1);
+ background:repeating-conic-gradient(from -10deg,rgba(150,85,0,.95) 0 2deg,transparent 2deg 18deg),
+  radial-gradient(circle,transparent 52%,rgba(120,60,0,.25) 100%),
+  repeating-conic-gradient(from -9deg,#f39a1e 0 18deg,#fff 18deg 36deg)}
+.num,.deco{position:absolute;width:60px;height:60px;left:50%;top:20px;margin-left:-30px;text-align:center;line-height:60px;transform-origin:30px 330px}
+.num,.num.white{font-size:56px;color:#fff;text-shadow:0 2px 3px #b35a00,0 0 8px rgba(120,50,0,.7)}
+.deco{font-size:40px;filter:sepia(1) saturate(7) hue-rotate(-18deg) brightness(.95) drop-shadow(0 2px 1px rgba(120,60,0,.6))}
+.ttl{position:absolute;text-align:center;color:#fff;font-size:42px;text-shadow:2px 2px 3px #000,0 0 8px #000}
+.val{position:absolute;width:335px;height:46px;line-height:46px;text-align:center;font-size:34px;color:#4a2d00;text-shadow:0 1px 0 #fff3b0;white-space:nowrap}
+.val.sm{font-size:24px;letter-spacing:9px}
+.val.mid{font-size:21px}
+.val.timer{width:335px;height:46px;line-height:42px;font-size:28px;letter-spacing:2px;color:#fff;text-shadow:0 2px 3px #000,0 0 7px #000}
+.val.spin{color:#0f5a1e}.val.end{color:#9b0000}
+.foot{position:absolute;left:0;right:0;top:638px;height:150px}
+.btn{position:absolute;background:linear-gradient(#e8483a,#7a1209);color:#fff;border:3px solid #ffd700;border-radius:26px;
+ padding:6px 54px;font-size:26px;cursor:pointer;letter-spacing:2px;text-shadow:1px 1px 2px #000;box-shadow:0 0 14px #000,inset 0 2px 0 rgba(255,255,255,.4)}
+.btn:hover{filter:brightness(1.25)}.btn:disabled{filter:grayscale(.8);cursor:not-allowed}
+.logout-btn{background:linear-gradient(#9aa5a6,#2c2c2c);border-color:#bbb;font-size:20px;padding:8px 36px}
+.ftitle{position:absolute;left:0;right:0;top:20px;text-align:center;color:#ffe9a0;font-size:24px;text-shadow:2px 2px 3px #000}
+.nums{position:absolute;left:0;right:0;top:62px;display:flex;justify-content:space-between;padding:0 58px}
+.nums button{width:64px;height:64px;font-size:28px;cursor:pointer;color:#fff;border-radius:50%;border:4px solid #ffd84a;
+ background:radial-gradient(circle at 36% 30%,#ffb066,#d2540f 60%,#8a2c00);text-shadow:1px 1px 2px #000;
+ box-shadow:0 0 0 3px #8b5a00,0 0 14px #ffae00,inset 0 -4px 6px rgba(0,0,0,.4)}
+.nums button:hover{transform:scale(1.15);filter:brightness(1.3)}
+.nums button.selected{background:radial-gradient(circle at 36% 30%,#9cff8c,#188b2e 60%,#07551a);border-color:#fff;box-shadow:0 0 0 4px #ffd84a,0 0 22px #48ff5c,inset 0 -4px 6px rgba(0,0,0,.4)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:100;display:flex;align-items:center;justify-content:center}
+.login{background:#1c1000;border:4px solid #d4af37;border-radius:15px;padding:40px 50px;text-align:center;color:#fff;box-shadow:0 0 30px #ffae00}
+.login h2{color:#ffd700;margin-bottom:20px}
+.login input{display:block;margin:10px auto;padding:10px 15px;width:240px;background:#111;border:2px solid #8b5a00;border-radius:8px;color:#fff;font-size:16px;text-align:center}
+.login input:focus{border-color:#ffd700;outline:none}
+.login button{margin-top:10px;padding:10px 30px;cursor:pointer;border:2px solid #ffd700;border-radius:20px;background:linear-gradient(#e74c3c,#922b21);color:#fff;font-weight:bold}
+.err{color:#ff6b6b;font-size:13px;min-height:16px;margin-top:8px}

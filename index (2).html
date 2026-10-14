@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fun Target</title>
+<link rel="stylesheet" href="scene.css">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+<div class="scene" id="scene" data-h="638" style="height:638px">
+<div class="bandclip"><div class="tilt"><div class="wheel" id="wheel"></div></div></div>
+<div class="ttl" style="left:22px;width:335px;top:32px">Status</div>
+<div class="val mid" id="status" style="left:22px;top:86px">WAITING...</div>
+<div class="ttl" style="left:22px;width:335px;top:330px">Timer</div>
+<div class="val timer" id="timer" style="left:22px;top:375px">--:--</div>
+<div class="val" id="winner" style="left:1285px;top:86px">-</div>
+<div class="val sm" id="last10" style="left:1285px;top:263px">- - - - - - - - - -</div>
+</div>
+<script>
+const firebaseConfig={
+  apiKey:"AIzaSyChx7rQNNVsmd5QCof-mXZU6OT5KoZrFDg",
+  authDomain:"funtarget.firebaseapp.com",
+  databaseURL:"https://funtarget-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"funtarget",
+  storageBucket:"funtarget.firebasestorage.app",
+  messagingSenderId:"905081850251",
+  appId:"1:905081850251:web:05a811f49d7f420b09078e"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+const roomId=new URLSearchParams(location.search).get('topic')||'spin';
+const room=db.ref('rooms/'+roomId);
+
+const order=[1,2,3,4,5,6,7,8,9,0];
+const wheelEl=document.getElementById('wheel');
+order.forEach((n,i)=>{
+  const d=document.createElement('div');
+  d.className='num'+(i%2?' white':'');
+  d.style.transform=`rotate(${i*36}deg)`;
+  d.textContent=n;
+  wheelEl.appendChild(d);
+});
+
+let spinning=false, rotation=0, history=[];
+let countdownInterval=null, nextSpinAt=0, lastSpinId=0;
+
+function normalizeHistory(value){
+  if(Array.isArray(value)) return value.map(Number).filter(Number.isInteger).slice(0,10);
+  if(typeof value==='string') return value.trim().split(/\s+/).map(Number).filter(Number.isInteger).slice(0,10);
+  if(value && typeof value==='object') return Object.values(value).map(Number).filter(Number.isInteger).slice(0,10);
+  return [];
+}
+
+function updateCountdown(){
+  const timerEl=document.getElementById('timer');
+  if(!nextSpinAt){
+    timerEl.textContent='--:--';
+    return;
+  }
+  const seconds=Math.max(0,Math.ceil((nextSpinAt-Date.now())/1000));
+  timerEl.textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
+}
+
+function setCountdown(timestamp){
+  nextSpinAt=Number(timestamp)||0;
+  if(countdownInterval) clearInterval(countdownInterval);
+  updateCountdown();
+  countdownInterval=nextSpinAt ? setInterval(updateCountdown,250) : null;
+}
+
+// Press ~ (backtick) opens admin page in new tab
+document.addEventListener('keydown', e=>{
+  if(e.key==='`' || e.key==='~' || e.code==='Backquote'){
+    window.open('admin.html', '_blank');
+  }
+});
+
+room.on('value',snapshot=>{
+  const data=snapshot.val();
+  if(!data){
+    showGameStart();
+    setCountdown(null);
+    return;
+  }
+
+  history=normalizeHistory(data.history);
+  document.getElementById('last10').textContent=history.join(' ')||'- - - - - - - - - -';
+  document.getElementById('winner').textContent=data.winner||'-';
+
+  if(data.state==='ended'){
+    showGameEnd();
+    setCountdown(null);
+  } else if(data.state==='spin' && data.spinId && data.spinId>lastSpinId){
+    const result=Number(data.result);
+    if(!Number.isInteger(result)||result<0||result>9){
+      document.getElementById('status').textContent='INVALID SPIN RESULT';
+      document.getElementById('status').classList.add('end');
+      return;
+    }
+    lastSpinId=data.spinId;
+    setCountdown(null);
+    startSpin(result);
+  } else if(data.state==='running'){
+    showGameStart();
+    setCountdown(data.nextSpinAt);
+  }
+},error=>{
+  document.getElementById('status').textContent='CONNECTION ERROR';
+  document.getElementById('status').classList.add('end');
+  console.error('Firebase read error:',error);
+});
+
+function showGameEnd(){
+  const s=document.getElementById('status');
+  s.textContent='🛑 GAME END';
+  s.classList.remove('spin');
+  s.classList.add('end');
+}
+function showGameStart(){
+  const s=document.getElementById('status');
+  s.textContent='WAITING...';
+  s.classList.remove('end');
+}
+
+function startSpin(result){
+  if(spinning) return;
+  spinning=true;
+  const statusEl=document.getElementById('status');
+  statusEl.textContent='🎡 SPINNING...';
+  statusEl.classList.remove('end');
+  statusEl.classList.add('spin');
+  document.getElementById('winner').textContent='-';
+
+  const idx=order.indexOf(result);
+  const neededMod=(360-(idx*36))%360;
+  const currentMod=((rotation%360)+360)%360;
+  const add=(neededMod-currentMod+360)%360;
+  rotation+=1440+add;
+  wheelEl.style.transform=`rotate(${rotation}deg)`;
+
+  setTimeout(()=>{
+    document.getElementById('winner').textContent=result;
+    statusEl.textContent='🏆 WINNER: '+result;
+    setTimeout(()=>{
+      statusEl.textContent='WAITING...';
+      statusEl.classList.remove('spin');
+    },3000);
+    spinning=false;
+  },4200);
+}
+</script>
+<script src="scene.js"></script>
+</body>
+</html>

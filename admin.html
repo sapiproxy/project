@@ -3,81 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <title>Admin - Fun Target</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; font-family:'Arial Black',Arial,sans-serif; user-select:none; }
-  body { background:#111; overflow:hidden; }
-  .wrap { width:100vw; height:100vh; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:30px;
-    background: radial-gradient(circle at 50% 40%, #2c2c2c 0%, #111 70%); }
-
-  .wheel-wrap { position:relative; }
-  .wheel {
-    width:380px; height:380px; border-radius:50%;
-    border:14px solid #d4af37; outline:4px solid #8b5a00;
-    box-shadow:0 0 40px #ffae00, inset 0 0 30px #000;
-    position:relative; transition:transform 4s cubic-bezier(.2,.8,.2,1);
-    background:conic-gradient(
-      #f39c12 0 36deg, #fff 36deg 72deg, #f39c12 72deg 108deg,
-      #fff 108deg 144deg, #f39c12 144deg 180deg, #fff 180deg 216deg,
-      #f39c12 216deg 252deg, #fff 252deg 288deg, #f39c12 288deg 324deg, #fff 324deg 360deg);
-  }
-  .num { position:absolute; width:40px; height:40px; left:50%; top:12px;
-    margin-left:-20px; color:#c03900; font-weight:bold; font-size:22px;
-    text-align:center; line-height:40px; transform-origin:20px 178px; }
-  .num.white { color:#fff; text-shadow:1px 1px 2px #000; }
-  .hub { position:absolute; top:50%; left:50%; width:110px; height:110px;
-    transform:translate(-50%,-50%); border-radius:50%;
-    background:radial-gradient(#ffe680,#d4af37 60%,#8b5a00);
-    border:6px solid #6a3b00; box-shadow:0 0 25px #ffd700;
-    display:flex; align-items:center; justify-content:center; }
-  .hub span { color:#7a4a00; font-size:26px; }
-  .arrow { position:absolute; top:-26px; left:50%; transform:translateX(-50%);
-    width:0; height:0; z-index:10;
-    border-left:20px solid transparent; border-right:20px solid transparent;
-    border-top:40px solid #e74c3c; filter:drop-shadow(0 0 8px #ffd700); }
-
-  .btn { background:linear-gradient(#e74c3c,#922b21); color:#fff; border:4px solid #ffd700;
-    border-radius:30px; padding:12px 50px; font-size:22px; cursor:pointer;
-    box-shadow:0 0 15px #000; letter-spacing:2px; }
-  .btn:hover { filter:brightness(1.25); }
-  .btn:disabled { filter:grayscale(0.8); cursor:not-allowed; }
-  .logout-btn { background:linear-gradient(#7f8c8d,#2c2c2c) !important;
-    border-color:#999 !important; font-size:16px !important; padding:10px 35px !important; }
-
-  .box { text-align:center; }
-  .box h2 { color:#fff; font-size:20px; margin-bottom:8px; }
-  .display { background:linear-gradient(#fdf6d8,#e8c96a); border:3px solid #b8860b;
-    border-radius:10px; color:#5a3a00; font-size:26px; padding:8px 25px; min-width:120px; }
-  .history .display { font-size:20px; letter-spacing:6px; min-width:300px; }
-  .row { display:flex; gap:40px; align-items:center; }
-
-  .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:100;
-    display:flex; align-items:center; justify-content:center; }
-  .login { background:#1c1c1c; border:3px solid #e74c3c; border-radius:15px;
-    padding:40px 50px; text-align:center; color:#fff; box-shadow:0 0 30px #e74c3c; }
-  .login h2 { color:#e74c3c; margin-bottom:20px; }
-  .login input { display:block; margin:10px auto; padding:10px 15px; width:240px;
-    background:#111; border:2px solid #555; border-radius:8px;
-    color:#fff; font-size:16px; text-align:center; }
-  .login input:focus { border-color:#ffd700; outline:none; }
-  .login button { margin-top:10px; padding:10px 30px; cursor:pointer;
-    border:2px solid #ffd700; border-radius:20px;
-    background:linear-gradient(#e74c3c,#922b21); color:#fff; font-weight:bold; }
-  .err { color:#ff6b6b; font-size:13px; min-height:16px; margin-top:8px; }
-
-  .force { text-align:center; }
-  .force h2 { color:#27ae60; margin-bottom:6px; font-size:20px; }
-  .force p { color:#aaa; font-size:12px; margin-bottom:12px; }
-  .nums { display:flex; gap:8px; justify-content:center; }
-  .nums button { width:46px; height:46px; font-size:20px; cursor:pointer; color:#fff;
-    border-radius:50%; border:3px solid #d4af37;
-    background:radial-gradient(circle at 35% 35%, #7ec850, #1e7a1e); }
-  .nums button:hover { transform:scale(1.15); filter:brightness(1.3); }
-  .info { color:#ffd700; font-size:14px; margin-top:10px; min-height:20px; }
-</style>
+<link rel="stylesheet" href="scene.css">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
-
 <!-- LOGIN SCREEN -->
 <div class="overlay" id="loginScreen">
   <div class="login">
@@ -89,35 +19,35 @@
   </div>
 </div>
 
-<!-- ADMIN GAME SCREEN -->
-<div class="wrap" id="gameScreen" style="display:none">
-
-  <div class="force">
-    <h2>⚙ Force Next Result</h2>
-    <p>Click a number — next spin will land on it. Leave empty for random.</p>
-    <div class="nums" id="nums"></div>
-    <div class="info" id="info">Next spin: RANDOM</div>
-  </div>
-
-  <div class="wheel-wrap">
-    <div class="arrow"></div>
-    <div class="wheel" id="wheel"></div>
-    <div class="hub"><span>€€€</span></div>
-  </div>
-
-  <button class="btn" id="spinBtn" onclick="spin()">SPIN</button>
-
-  <div class="row">
-    <div class="box"><h2>Winner</h2><div class="display" id="winner">-</div></div>
-    <div class="box history"><h2>Last 10</h2><div class="display" id="last10">- - - - - - - - - -</div></div>
-  </div>
-
-  <button class="btn logout-btn" onclick="logout()">LOGOUT</button>
-</div>
-
+<div id="gameScreen" style="display:none"><div class="scene" id="scene" data-h="788" style="height:788px">
+<div class="bandclip"><div class="tilt"><div class="wheel" id="wheel"></div></div></div>
+<div class="ttl" style="left:22px;width:335px;top:32px">Next Spin</div>
+<div class="val mid" id="info" style="left:22px;top:86px;font-size:19px">Next spin: RANDOM</div>
+<div class="ttl" style="left:22px;width:335px;top:330px">Timer</div>
+<div class="val timer" id="timer" style="left:22px;top:375px">--:--</div>
+<div class="val" id="winner" style="left:1285px;top:86px">-</div>
+<div class="val sm" id="last10" style="left:1285px;top:263px">- - - - - - - - - -</div>
+<div class="foot"><div class="ftitle">⚙ Force Next Result</div><div class="nums" id="nums"></div>
+<button class="btn logout-btn" style="left:30px;top:6px" onclick="logout()">LOGOUT</button>
+<button class="btn" id="spinBtn" style="left:1310px;top:2px" onclick="spin()">SPIN</button></div>
+</div></div>
 <script>
 const ADMIN_USER='admin';
 const ADMIN_PASS='admin123';
+
+const firebaseConfig={
+  apiKey:"AIzaSyChx7rQNNVsmd5QCof-mXZU6OT5KoZrFDg",
+  authDomain:"funtarget.firebaseapp.com",
+  databaseURL:"https://funtarget-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"funtarget",
+  storageBucket:"funtarget.firebasestorage.app",
+  messagingSenderId:"905081850251",
+  appId:"1:905081850251:web:05a811f49d7f420b09078e"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+const roomId=new URLSearchParams(location.search).get('topic')||'spin';
+const room=db.ref('rooms/'+roomId);
 
 const order=[1,2,3,4,5,6,7,8,9,0];
 const wheelEl=document.getElementById('wheel');
@@ -132,44 +62,118 @@ order.forEach((n,i)=>{
 const numsEl=document.getElementById('nums');
 for(let n=0;n<=9;n++){
   const b=document.createElement('button');
+  b.type='button';
   b.textContent=n;
-  b.onclick=()=>{ forced=n; document.getElementById('info').textContent=`✔ Next spin will land on ${n}`; };
+  b.setAttribute('aria-pressed','false');
+  b.onclick=()=>{
+    clearForcedSelection();
+    forced=n;
+    b.classList.add('selected');
+    b.setAttribute('aria-pressed','true');
+    document.getElementById('info').textContent=`✔ Next spin will land on ${n}`;
+  };
   numsEl.appendChild(b);
 }
 
 let loggedIn=false, spinning=false, rotation=0, forced=null;
+let countdownInterval=null, nextSpinAt=0;
 let history=[];
 
-function login(){
+function showFirebaseError(error){
+  console.error('Firebase error:',error);
+  document.getElementById('info').textContent='Online connection error. Check database access.';
+}
+
+function clearForcedSelection(){
+  const selectedButton=numsEl.querySelector('.selected');
+  if(selectedButton){
+    selectedButton.classList.remove('selected');
+    selectedButton.setAttribute('aria-pressed','false');
+  }
+}
+
+function normalizeHistory(value){
+  if(Array.isArray(value)) return value.map(Number).filter(Number.isInteger).slice(0,10);
+  if(typeof value==='string') return value.trim().split(/\s+/).map(Number).filter(Number.isInteger).slice(0,10);
+  if(value && typeof value==='object') return Object.values(value).map(Number).filter(Number.isInteger).slice(0,10);
+  return [];
+}
+
+function updateCountdown(){
+  const timerEl=document.getElementById('timer');
+  if(!nextSpinAt){
+    timerEl.textContent='--:--';
+    return;
+  }
+  const seconds=Math.max(0,Math.ceil((nextSpinAt-Date.now())/1000));
+  timerEl.textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
+  if(seconds===0 && loggedIn && !spinning){
+    clearInterval(countdownInterval);
+    countdownInterval=null;
+    spin();
+  }
+}
+
+function startCountdown(timestamp){
+  nextSpinAt=Number(timestamp)||0;
+  if(countdownInterval) clearInterval(countdownInterval);
+  updateCountdown();
+  countdownInterval=nextSpinAt ? setInterval(updateCountdown,250) : null;
+}
+
+async function login(){
   if(document.getElementById('user').value===ADMIN_USER &&
      document.getElementById('pass').value===ADMIN_PASS){
-    loggedIn=true;
-    document.getElementById('loginScreen').style.display='none';
-    document.getElementById('gameScreen').style.display='flex';
-    // Game is running — players see "WAITING FOR ADMIN"
-    localStorage.setItem('ft_status','running');
-    // Restore history (fresh login starts empty)
-    history=[];
-    document.getElementById('last10').textContent='- - - - - - - - - -';
+    const errorEl=document.getElementById('err');
+    errorEl.textContent='Connecting...';
+    try{
+      const snapshot=await room.once('value');
+      const data=snapshot.val()||{};
+      history=normalizeHistory(data.history);
+      const deadline=Date.now()+60000;
+      await room.update({
+        state:'running',
+        winner:data.winner||'-',
+        history,
+        nextSpinAt:deadline,
+        spinId:Number(data.spinId)||0
+      });
+      loggedIn=true;
+      document.getElementById('last10').textContent=history.join(' ')||'- - - - - - - - - -';
+      document.getElementById('winner').textContent=data.winner||'-';
+      document.getElementById('loginScreen').style.display='none';
+      document.getElementById('gameScreen').style.display='flex';
+      document.getElementById('info').textContent='Next spin: RANDOM';
+      startCountdown(deadline);
+    }catch(error){
+      console.error('Firebase login/read error:',error);
+      errorEl.textContent='Could not connect to online game. Check Firebase database rules.';
+    }
   } else {
     document.getElementById('err').textContent='Wrong username or password!';
   }
 }
 
-function logout(){
+async function logout(){
   if(spinning){ alert('Wait for the spin to finish!'); return; }
+  if(countdownInterval) clearInterval(countdownInterval);
+  countdownInterval=null;
+  nextSpinAt=0;
+  document.getElementById('timer').textContent='--:--';
+  try{
+    await room.update({state:'ended',nextSpinAt:null,winner:'-',history:[]});
+  }catch(error){
+    showFirebaseError(error);
+    return;
+  }
   loggedIn=false;
   forced=null;
-  // Reset everything
+  clearForcedSelection();
   history=[];
   rotation=0;
   document.getElementById('last10').textContent='- - - - - - - - - -';
   document.getElementById('winner').textContent='-';
   document.getElementById('info').textContent='Next spin: RANDOM';
-  // Tell player pages: GAME END + clear history
-  localStorage.setItem('ft_status','ended');
-  localStorage.setItem('ft_history', JSON.stringify([]));
-  // Show login again
   document.getElementById('gameScreen').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('err').textContent='';
@@ -177,35 +181,58 @@ function logout(){
   document.getElementById('pass').value='';
 }
 
-function spin(){
+async function spin(){
   if(spinning) return;
   spinning=true;
+  if(countdownInterval) clearInterval(countdownInterval);
+  countdownInterval=null;
+  document.getElementById('timer').textContent='00:00';
   document.getElementById('spinBtn').disabled=true;
   document.getElementById('winner').textContent='-';
 
   const result=(forced!==null)?forced:Math.floor(Math.random()*10);
   forced=null;
+  clearForcedSelection();
   document.getElementById('info').textContent='Next spin: RANDOM';
 
   const idx=order.indexOf(result);
   const neededMod=(360-(idx*36))%360;
   const currentMod=((rotation%360)+360)%360;
   const add=(neededMod-currentMod+360)%360;
+  const spinId=Date.now();
+  try{
+    await room.update({state:'spin',result,spinId,nextSpinAt:null});
+  }catch(error){
+    spinning=false;
+    document.getElementById('spinBtn').disabled=false;
+    document.getElementById('timer').textContent='--:--';
+    showFirebaseError(error);
+    return;
+  }
   rotation+=1440+add;
   wheelEl.style.transform=`rotate(${rotation}deg)`;
-
-  localStorage.setItem('ft_spin', JSON.stringify({result, time:Date.now()}));
 
   setTimeout(()=>{
     document.getElementById('winner').textContent=result;
     history.unshift(result);
     if(history.length>10) history.pop();
     document.getElementById('last10').textContent=history.join(' ');
-    localStorage.setItem('ft_history', JSON.stringify(history));
+    const deadline=Date.now()+60000;
+    room.update({
+      state:'running',
+      result,
+      winner:String(result),
+      history,
+      spinId,
+      nextSpinAt:deadline
+    }).then(()=>{
+      startCountdown(deadline);
+    }).catch(showFirebaseError);
     spinning=false;
     document.getElementById('spinBtn').disabled=false;
   },4200);
 }
 </script>
+<script src="scene.js"></script>
 </body>
 </html>
