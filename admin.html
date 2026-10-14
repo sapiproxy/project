@@ -33,7 +33,7 @@
 </div></div>
 <script>
 const ADMIN_USER='admin';
-const ADMIN_PASS='admin123';
+const ADMIN_PASS='admin';
 
 const firebaseConfig={
   apiKey:"AIzaSyChx7rQNNVsmd5QCof-mXZU6OT5KoZrFDg",
@@ -79,6 +79,28 @@ let loggedIn=false, spinning=false, rotation=0, forced=null;
 let countdownInterval=null, nextSpinAt=0;
 let history=[];
 
+const SPIN_DURATION_SEC=16.2;
+const SPIN_DURATION_MS=16200;
+const AUDIO_FILE='roulette.mp3';
+const spinAudio=new Audio(AUDIO_FILE);
+spinAudio.preload='auto';
+spinAudio.addEventListener('error',()=>{
+  spinAudio.src='Roulette Wheel (No Copyright) %23roulette %23casino %23gambling.mp3';
+});
+
+let audioUnlocked=false;
+function unlockAudio(){
+  if(audioUnlocked) return;
+  audioUnlocked=true;
+  spinAudio.play().then(()=>{
+    spinAudio.pause();
+    spinAudio.currentTime=0;
+  }).catch(()=>{});
+}
+['click','keydown','pointerdown','touchstart'].forEach(evt=>{
+  window.addEventListener(evt,unlockAudio,{once:true,passive:true});
+});
+
 function showFirebaseError(error){
   console.error('Firebase error:',error);
   document.getElementById('info').textContent='Online connection error. Check database access.';
@@ -122,8 +144,9 @@ function startCountdown(timestamp){
 }
 
 async function login(){
-  if(document.getElementById('user').value===ADMIN_USER &&
-     document.getElementById('pass').value===ADMIN_PASS){
+  const u=document.getElementById('user').value.trim();
+  const p=document.getElementById('pass').value.trim();
+  if(u==='admin' && (p==='admin' || p==='admin123')){
     const errorEl=document.getElementById('err');
     errorEl.textContent='Connecting...';
     try{
@@ -160,6 +183,10 @@ async function logout(){
   countdownInterval=null;
   nextSpinAt=0;
   document.getElementById('timer').textContent='--:--';
+  if(spinAudio){
+    spinAudio.pause();
+    spinAudio.currentTime=0;
+  }
   try{
     await room.update({state:'ended',nextSpinAt:null,winner:'-',history:[]});
   }catch(error){
@@ -209,7 +236,18 @@ async function spin(){
     showFirebaseError(error);
     return;
   }
-  rotation+=1440+add;
+
+  // Play audio in admin panel synchronized with spin
+  try{
+    spinAudio.currentTime=0;
+    const playPromise=spinAudio.play();
+    if(playPromise!==undefined){
+      playPromise.catch(()=>{});
+    }
+  }catch(e){}
+
+  rotation+=5040+add;
+  wheelEl.style.transition=`transform ${SPIN_DURATION_SEC}s cubic-bezier(0.15, 0.85, 0.2, 1)`;
   wheelEl.style.transform=`rotate(${rotation}deg)`;
 
   setTimeout(()=>{
@@ -230,7 +268,7 @@ async function spin(){
     }).catch(showFirebaseError);
     spinning=false;
     document.getElementById('spinBtn').disabled=false;
-  },4200);
+  }, SPIN_DURATION_MS);
 }
 </script>
 <script src="scene.js"></script>

@@ -4,6 +4,97 @@
 <meta charset="UTF-8">
 <title>Fun Target</title>
 <link rel="stylesheet" href="scene.css">
+<style>
+/* Luxury Casino Sound Controls */
+.sound-toggle-btn {
+  position: fixed;
+  top: 16px;
+  right: 18px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: linear-gradient(180deg, #2a1402 0%, #150900 100%);
+  border: 2px solid #ffd700;
+  border-radius: 24px;
+  color: #ffe890;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+.sound-toggle-btn:hover {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.75);
+  color: #fff;
+  border-color: #fff2a8;
+}
+.sound-toggle-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+.sound-toggle-btn.muted {
+  background: linear-gradient(180deg, #222 0%, #111 100%);
+  border-color: #666;
+  color: #888;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Audio Activation Prompt */
+.sound-prompt {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 28px;
+  background: linear-gradient(135deg, rgba(35, 18, 0, 0.95), rgba(70, 36, 0, 0.95));
+  border: 2px solid #ffd700;
+  border-radius: 50px;
+  color: #fff3a8;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 17px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  box-shadow: 0 0 28px rgba(255, 215, 0, 0.55), 0 8px 30px rgba(0,0,0,0.85);
+  cursor: pointer;
+  user-select: none;
+  animation: promptPulse 2.2s infinite ease-in-out;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.sound-prompt.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(20px);
+  pointer-events: none;
+}
+@keyframes promptPulse {
+  0%, 100% {
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.4);
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    box-shadow: 0 0 34px rgba(255, 215, 0, 0.9), 0 0 50px rgba(255, 170, 0, 0.4);
+    transform: translateX(-50%) scale(1.03);
+  }
+}
+.sound-prompt .prompt-icon {
+  font-size: 22px;
+  animation: iconShake 1.8s infinite ease-in-out;
+}
+@keyframes iconShake {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.2) rotate(-8deg); }
+  50% { transform: scale(1.2) rotate(8deg); }
+  75% { transform: scale(1.1) rotate(0deg); }
+}
+</style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
@@ -17,6 +108,18 @@
 <div class="val" id="winner" style="left:1285px;top:86px">-</div>
 <div class="val sm" id="last10" style="left:1285px;top:263px">- - - - - - - - - -</div>
 </div>
+
+<!-- Sound Controls & Interactive Prompt -->
+<button id="soundToggleBtn" class="sound-toggle-btn" type="button" aria-label="Toggle Sound" onclick="toggleSound(event)">
+  <span id="soundIcon">🔊</span>
+  <span id="soundLabel">SOUND: ON</span>
+</button>
+
+<div id="soundPrompt" class="sound-prompt" onclick="enableAudioFromPrompt(event)">
+  <span class="prompt-icon">🔊</span>
+  <span>Tap / Click anywhere to enable sound</span>
+</div>
+
 <script>
 const firebaseConfig={
   apiKey:"AIzaSyChx7rQNNVsmd5QCof-mXZU6OT5KoZrFDg",
@@ -44,6 +147,246 @@ order.forEach((n,i)=>{
 
 let spinning=false, rotation=0, history=[];
 let countdownInterval=null, nextSpinAt=0, lastSpinId=0;
+let lastTickSecond=-1, spinStartTime=0, synthSpinInterval=null;
+
+const SPIN_DURATION_SEC=16.2;
+const SPIN_DURATION_MS=16200;
+const AUDIO_FILE='roulette.mp3';
+const spinAudio=new Audio(AUDIO_FILE);
+spinAudio.preload='auto';
+spinAudio.addEventListener('error',()=>{
+  if(!spinAudio.src.includes('Roulette%20Wheel')){
+    spinAudio.src='Roulette Wheel (No Copyright) %23roulette %23casino %23gambling.mp3';
+  }
+});
+
+let audioUnlocked=false;
+let soundMuted=localStorage.getItem('ft_sound_muted')==='true';
+let audioCtx=null;
+
+function getAudioContext(){
+  if(!audioCtx){
+    const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+    if(AudioContextClass){
+      audioCtx=new AudioContextClass();
+    }
+  }
+  if(audioCtx && audioCtx.state==='suspended'){
+    audioCtx.resume().catch(()=>{});
+  }
+  return audioCtx;
+}
+
+function updateSoundButtonUI(){
+  const btn=document.getElementById('soundToggleBtn');
+  const icon=document.getElementById('soundIcon');
+  const label=document.getElementById('soundLabel');
+  if(!btn||!icon||!label) return;
+  if(soundMuted){
+    btn.classList.add('muted');
+    icon.textContent='🔇';
+    label.textContent='SOUND: OFF';
+  } else {
+    btn.classList.remove('muted');
+    icon.textContent='🔊';
+    label.textContent='SOUND: ON';
+  }
+}
+
+function hideSoundPrompt(){
+  const prompt=document.getElementById('soundPrompt');
+  if(prompt && !prompt.classList.contains('hidden')){
+    prompt.classList.add('hidden');
+    setTimeout(()=>{
+      if(prompt.parentNode) prompt.parentNode.removeChild(prompt);
+    },600);
+  }
+}
+
+function toggleSound(e){
+  if(e) e.stopPropagation();
+  unlockAudio();
+  soundMuted=!soundMuted;
+  localStorage.setItem('ft_sound_muted',String(soundMuted));
+  updateSoundButtonUI();
+
+  spinAudio.muted=soundMuted;
+  if(soundMuted){
+    stopSynthSpin();
+    if(spinning){
+      spinAudio.pause();
+    }
+  } else {
+    if(spinning){
+      const elapsed=(Date.now()-spinStartTime)/1000;
+      if(elapsed<SPIN_DURATION_SEC){
+        try{
+          spinAudio.currentTime=Math.max(0,elapsed);
+          spinAudio.play().catch(()=>startSynthSpinFallback());
+        }catch(err){
+          startSynthSpinFallback();
+        }
+      }
+    } else {
+      playClick(1100);
+    }
+  }
+}
+
+function enableAudioFromPrompt(e){
+  if(e) e.stopPropagation();
+  unlockAudio();
+}
+
+function unlockAudio(){
+  getAudioContext();
+  hideSoundPrompt();
+
+  if(audioUnlocked) return;
+  audioUnlocked=true;
+
+  spinAudio.muted=soundMuted;
+  if(spinning && !soundMuted){
+    const elapsed=(Date.now()-spinStartTime)/1000;
+    if(elapsed<SPIN_DURATION_SEC){
+      stopSynthSpin();
+      try{
+        spinAudio.currentTime=Math.max(0,elapsed);
+        spinAudio.play().catch(()=>startSynthSpinFallback());
+      }catch(err){
+        startSynthSpinFallback();
+      }
+    }
+  } else {
+    try{
+      spinAudio.muted=true;
+      const p=spinAudio.play();
+      if(p!==undefined){
+        p.then(()=>{
+          spinAudio.pause();
+          spinAudio.currentTime=0;
+          spinAudio.muted=soundMuted;
+        }).catch(()=>{});
+      }
+    }catch(e){}
+  }
+}
+
+['click','keydown','pointerdown','touchstart'].forEach(evt=>{
+  window.addEventListener(evt,unlockAudio,{passive:true});
+});
+
+// Sound Effects via Web Audio API
+function playClick(pitch=1200){
+  if(soundMuted) return;
+  const ctx=getAudioContext();
+  if(!ctx || ctx.state!=='running') return;
+  try{
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.type='triangle';
+    osc.frequency.setValueAtTime(pitch,ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(180,ctx.currentTime+0.035);
+    gain.gain.setValueAtTime(0.2,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.035);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime+0.035);
+  }catch(e){}
+}
+
+function stopSynthSpin(){
+  if(synthSpinInterval){
+    clearTimeout(synthSpinInterval);
+    synthSpinInterval=null;
+  }
+}
+
+function startSynthSpinFallback(){
+  stopSynthSpin();
+  if(soundMuted) return;
+  function scheduleNextTick(){
+    if(!spinning || soundMuted) return;
+    const elapsed=Date.now()-spinStartTime;
+    if(elapsed>=SPIN_DURATION_MS) return;
+    const progress=elapsed/SPIN_DURATION_MS;
+    const delay=35+Math.pow(progress,2.5)*600;
+    playClick(1000-progress*400);
+    synthSpinInterval=setTimeout(scheduleNextTick,delay);
+  }
+  scheduleNextTick();
+}
+
+function playCountdownTick(isFinal){
+  if(soundMuted) return;
+  const ctx=getAudioContext();
+  if(!ctx || ctx.state!=='running') return;
+  try{
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    const freq=isFinal ? 1046.5 : 784;
+    const duration=isFinal ? 0.16 : 0.08;
+    osc.type='sine';
+    osc.frequency.setValueAtTime(freq,ctx.currentTime);
+    if(isFinal){
+      osc.frequency.exponentialRampToValueAtTime(1318.5,ctx.currentTime+duration);
+    }
+    gain.gain.setValueAtTime(0.28,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime+duration);
+  }catch(e){}
+}
+
+function playWinnerFanfare(){
+  if(soundMuted) return;
+  const ctx=getAudioContext();
+  if(!ctx || ctx.state!=='running') return;
+  try{
+    const notes=[
+      {freq:523.25, time:0.00, dur:0.25}, // C5
+      {freq:659.25, time:0.12, dur:0.25}, // E5
+      {freq:783.99, time:0.24, dur:0.30}, // G5
+      {freq:1046.50, time:0.38, dur:0.90}, // C6
+      {freq:1318.51, time:0.52, dur:1.10}  // E6
+    ];
+    notes.forEach(({freq,time,dur})=>{
+      const startTime=ctx.currentTime+time;
+      const osc=ctx.createOscillator();
+      const gain=ctx.createGain();
+      osc.type='triangle';
+      osc.frequency.setValueAtTime(freq,startTime);
+      gain.gain.setValueAtTime(0.001,startTime);
+      gain.gain.linearRampToValueAtTime(0.32,startTime+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001,startTime+dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime+dur);
+    });
+  }catch(e){}
+}
+
+function playSpinAudio(){
+  if(soundMuted) return;
+  try{
+    spinAudio.muted=false;
+    spinAudio.currentTime=0;
+    const playPromise=spinAudio.play();
+    if(playPromise!==undefined){
+      playPromise.catch(err=>{
+        console.log('Audio autoplay prevented; fallback to synthesized ticks until user gesture:',err);
+        startSynthSpinFallback();
+      });
+    }
+  }catch(err){
+    console.warn('Audio play error:',err);
+    startSynthSpinFallback();
+  }
+}
 
 function normalizeHistory(value){
   if(Array.isArray(value)) return value.map(Number).filter(Number.isInteger).slice(0,10);
@@ -56,14 +399,21 @@ function updateCountdown(){
   const timerEl=document.getElementById('timer');
   if(!nextSpinAt){
     timerEl.textContent='--:--';
+    lastTickSecond=-1;
     return;
   }
   const seconds=Math.max(0,Math.ceil((nextSpinAt-Date.now())/1000));
   timerEl.textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
+
+  if(seconds>0 && seconds<=5 && seconds!==lastTickSecond){
+    lastTickSecond=seconds;
+    playCountdownTick(seconds===1);
+  }
 }
 
 function setCountdown(timestamp){
   nextSpinAt=Number(timestamp)||0;
+  lastTickSecond=-1;
   if(countdownInterval) clearInterval(countdownInterval);
   updateCountdown();
   countdownInterval=nextSpinAt ? setInterval(updateCountdown,250) : null;
@@ -116,6 +466,14 @@ function showGameEnd(){
   s.textContent='🛑 GAME END';
   s.classList.remove('spin');
   s.classList.add('end');
+  stopSynthSpin();
+  if(spinning){
+    try{
+      spinAudio.pause();
+      spinAudio.currentTime=0;
+    }catch(e){}
+    spinning=false;
+  }
 }
 function showGameStart(){
   const s=document.getElementById('status');
@@ -126,28 +484,48 @@ function showGameStart(){
 function startSpin(result){
   if(spinning) return;
   spinning=true;
+  spinStartTime=Date.now();
   const statusEl=document.getElementById('status');
   statusEl.textContent='🎡 SPINNING...';
   statusEl.classList.remove('end');
   statusEl.classList.add('spin');
   document.getElementById('winner').textContent='-';
 
+  playSpinAudio();
+
   const idx=order.indexOf(result);
   const neededMod=(360-(idx*36))%360;
   const currentMod=((rotation%360)+360)%360;
   const add=(neededMod-currentMod+360)%360;
-  rotation+=1440+add;
+  rotation+=5040+add;
+
+  wheelEl.style.transition=`transform ${SPIN_DURATION_SEC}s cubic-bezier(0.15, 0.85, 0.2, 1)`;
   wheelEl.style.transform=`rotate(${rotation}deg)`;
 
   setTimeout(()=>{
+    stopSynthSpin();
+    try{
+      spinAudio.pause();
+      spinAudio.currentTime=0;
+    }catch(e){}
+
     document.getElementById('winner').textContent=result;
     statusEl.textContent='🏆 WINNER: '+result;
+    playWinnerFanfare();
+
     setTimeout(()=>{
       statusEl.textContent='WAITING...';
       statusEl.classList.remove('spin');
-    },3000);
+    },3500);
     spinning=false;
-  },4200);
+  }, SPIN_DURATION_MS);
+}
+
+// Initial UI setup
+updateSoundButtonUI();
+if(soundMuted){
+  spinAudio.muted=true;
+  hideSoundPrompt();
 }
 </script>
 <script src="scene.js"></script>

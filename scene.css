@@ -4,7 +4,7 @@ body{margin:0}
 .scene{position:fixed;left:50%;top:50%;width:1667px;transform:translate(-50%,-50%) scale(var(--scene-scale,1));transform-origin:center;background:#000 url(bg.jpg) 0 0/1667px 638px no-repeat}
 .bandclip{position:absolute;inset:0;clip-path:path(evenodd,'M481 249 L481 286 L485 304 L492 322 L515 358 L533 377 L555 395 L564 395 L564 385 L561 379 L561 362 L566 355 L566 313 L589 312 L580 283 L580 253 L586 233 L602 206 L626 182 L661 159 L703 141 L746 129 L811 121 L849 121 L897 126 L935 134 L976 148 L999 159 L1025 175 L1045 192 L1058 206 L1068 221 L1076 238 L1080 253 L1081 274 L1078 292 L1071 308 L1071 312 L1097 313 L1097 382 L1107 382 L1112 386 L1117 386 L1124 379 L1124 369 L1136 368 L1149 353 L1161 335 L1171 315 L1178 291 L1180 274 L1179 249 L1175 232 L1159 197 L1133 165 L1097 135 L1043 105 L982 83 L917 69 L849 63 L777 65 L710 75 L652 91 L599 114 L556 140 L543 150 L517 176 L501 197 L492 214 Z')}
 .tilt{position:absolute;left:480px;top:-82px;width:700px;height:700px;transform:scaleY(.586)}
-.wheel{width:700px;height:700px;border-radius:50%;transition:transform 4s cubic-bezier(.2,.8,.2,1);
+.wheel{width:700px;height:700px;border-radius:50%;transition:transform var(--spin-duration, 16.2s) cubic-bezier(.15,.85,.2,1);
  background:repeating-conic-gradient(from -10deg,rgba(150,85,0,.95) 0 2deg,transparent 2deg 18deg),
   radial-gradient(circle,transparent 52%,rgba(120,60,0,.25) 100%),
   repeating-conic-gradient(from -9deg,#f39a1e 0 18deg,#fff 18deg 36deg)}
