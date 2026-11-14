@@ -405,7 +405,7 @@ function updateCountdown(){
   const seconds=Math.max(0,Math.ceil((nextSpinAt-Date.now())/1000));
   timerEl.textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
 
-  if(seconds>0 && seconds<=5 && seconds!==lastTickSecond){
+  if(seconds>0 && seconds<=10 && seconds!==lastTickSecond){
     lastTickSecond=seconds;
     playCountdownTick(seconds===1);
   }
