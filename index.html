@@ -161,7 +161,7 @@ spinAudio.addEventListener('error',()=>{
 });
 
 let audioUnlocked=false;
-let soundMuted=localStorage.getItem('ft_sound_muted')==='true';
+let soundMuted=false;
 let audioCtx=null;
 
 function getAudioContext(){
@@ -207,7 +207,6 @@ function toggleSound(e){
   if(e) e.stopPropagation();
   unlockAudio();
   soundMuted=!soundMuted;
-  localStorage.setItem('ft_sound_muted',String(soundMuted));
   updateSoundButtonUI();
 
   spinAudio.muted=soundMuted;
