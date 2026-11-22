@@ -117,7 +117,7 @@
 
 <div id="soundPrompt" class="sound-prompt" onclick="enableAudioFromPrompt(event)">
   <span class="prompt-icon">🔊</span>
-  <span>Tap / Click anywhere to enable sound</span>
+  <span>Sound is ON — tap / click once to allow spin audio</span>
 </div>
 
 <script>
@@ -161,6 +161,7 @@ spinAudio.addEventListener('error',()=>{
 });
 
 let audioUnlocked=false;
+let audioUnlockPending=false;
 let soundMuted=false;
 let audioCtx=null;
 
@@ -205,7 +206,6 @@ function hideSoundPrompt(){
 
 function toggleSound(e){
   if(e) e.stopPropagation();
-  unlockAudio();
   soundMuted=!soundMuted;
   updateSoundButtonUI();
 
@@ -216,6 +216,7 @@ function toggleSound(e){
       spinAudio.pause();
     }
   } else {
+    unlockAudio();
     if(spinning){
       const elapsed=(Date.now()-spinStartTime)/1000;
       if(elapsed<SPIN_DURATION_SEC){
@@ -239,35 +240,48 @@ function enableAudioFromPrompt(e){
 
 function unlockAudio(){
   getAudioContext();
-  hideSoundPrompt();
+  if(audioUnlocked || audioUnlockPending || soundMuted) return;
+  audioUnlockPending=true;
 
-  if(audioUnlocked) return;
-  audioUnlocked=true;
-
-  spinAudio.muted=soundMuted;
-  if(spinning && !soundMuted){
+  if(spinning){
     const elapsed=(Date.now()-spinStartTime)/1000;
     if(elapsed<SPIN_DURATION_SEC){
       stopSynthSpin();
       try{
+        spinAudio.muted=false;
         spinAudio.currentTime=Math.max(0,elapsed);
-        spinAudio.play().catch(()=>startSynthSpinFallback());
+        spinAudio.play().then(()=>{
+          audioUnlocked=true;
+          audioUnlockPending=false;
+          hideSoundPrompt();
+        }).catch(()=>{
+          audioUnlockPending=false;
+          startSynthSpinFallback();
+        });
       }catch(err){
+        audioUnlockPending=false;
         startSynthSpinFallback();
       }
+      return;
     }
-  } else {
-    try{
-      spinAudio.muted=true;
-      const p=spinAudio.play();
-      if(p!==undefined){
-        p.then(()=>{
-          spinAudio.pause();
-          spinAudio.currentTime=0;
-          spinAudio.muted=soundMuted;
-        }).catch(()=>{});
-      }
-    }catch(e){}
+  }
+
+  try{
+    spinAudio.muted=true;
+    spinAudio.play().then(()=>{
+      spinAudio.pause();
+      spinAudio.currentTime=0;
+      spinAudio.muted=soundMuted;
+      audioUnlocked=true;
+      audioUnlockPending=false;
+      hideSoundPrompt();
+    }).catch(()=>{
+      spinAudio.muted=soundMuted;
+      audioUnlockPending=false;
+    });
+  }catch(err){
+    spinAudio.muted=soundMuted;
+    audioUnlockPending=false;
   }
 }
 
