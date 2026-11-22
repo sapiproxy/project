@@ -4,6 +4,32 @@
 <meta charset="UTF-8">
 <title>Admin - Fun Target</title>
 <link rel="stylesheet" href="scene.css">
+<style>
+.sound-toggle-btn {
+  position: fixed;
+  top: 16px;
+  right: 18px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: linear-gradient(180deg, #2a1402 0%, #150900 100%);
+  border: 2px solid #ffd700;
+  border-radius: 24px;
+  color: #ffe890;
+  font-size: 15px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.sound-toggle-btn.muted {
+  background: linear-gradient(180deg, #222 0%, #111 100%);
+  border-color: #666;
+  color: #888;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+}
+</style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
@@ -31,6 +57,10 @@
 <button class="btn logout-btn" style="left:30px;top:6px" onclick="logout()">LOGOUT</button>
 <button class="btn" id="spinBtn" style="left:1310px;top:2px" onclick="spin()">SPIN</button></div>
 </div></div>
+<button id="adminSoundToggleBtn" class="sound-toggle-btn" type="button" aria-label="Toggle admin sound" onclick="toggleAdminSound(event)">
+  <span id="adminSoundIcon">🔊</span>
+  <span id="adminSoundLabel">SOUND: ON</span>
+</button>
 <script>
 const ADMIN_USER='admin';
 const ADMIN_PASS='admin';
@@ -48,6 +78,7 @@ firebase.initializeApp(firebaseConfig);
 const db=firebase.database();
 const roomId=new URLSearchParams(location.search).get('topic')||'spin';
 const room=db.ref('rooms/'+roomId);
+const adminSessionRef=room.child('adminSession');
 
 const order=[1,2,3,4,5,6,7,8,9,0];
 const wheelEl=document.getElementById('wheel');
@@ -78,6 +109,7 @@ for(let n=0;n<=9;n++){
 let loggedIn=false, spinning=false, rotation=0, forced=null;
 let countdownInterval=null, nextSpinAt=0, spinTimeout=null;
 let activeLogoutVersion=0;
+let adminSessionToken=null;
 let history=[];
 
 const SPIN_DURATION_SEC=16.2;
@@ -85,13 +117,15 @@ const SPIN_DURATION_MS=16200;
 const AUDIO_FILE='roulette.mp3';
 const spinAudio=new Audio(AUDIO_FILE);
 spinAudio.preload='auto';
+let adminSoundMuted=localStorage.getItem('ft_admin_sound_muted')==='true';
+spinAudio.muted=adminSoundMuted;
 spinAudio.addEventListener('error',()=>{
   spinAudio.src='Roulette Wheel (No Copyright) %23roulette %23casino %23gambling.mp3';
 });
 
 let audioUnlocked=false;
 function unlockAudio(){
-  if(audioUnlocked) return;
+  if(audioUnlocked || adminSoundMuted) return;
   audioUnlocked=true;
   spinAudio.play().then(()=>{
     spinAudio.pause();
@@ -101,6 +135,28 @@ function unlockAudio(){
 ['click','keydown','pointerdown','touchstart'].forEach(evt=>{
   window.addEventListener(evt,unlockAudio,{once:true,passive:true});
 });
+
+function updateAdminSoundButton(){
+  const button=document.getElementById('adminSoundToggleBtn');
+  document.getElementById('adminSoundIcon').textContent=adminSoundMuted?'🔇':'🔊';
+  document.getElementById('adminSoundLabel').textContent=adminSoundMuted?'SOUND: OFF':'SOUND: ON';
+  button.classList.toggle('muted',adminSoundMuted);
+  button.setAttribute('aria-pressed',String(!adminSoundMuted));
+}
+
+function toggleAdminSound(event){
+  if(event) event.stopPropagation();
+  adminSoundMuted=!adminSoundMuted;
+  localStorage.setItem('ft_admin_sound_muted',String(adminSoundMuted));
+  spinAudio.muted=adminSoundMuted;
+  updateAdminSoundButton();
+  if(adminSoundMuted){
+    spinAudio.pause();
+  }else if(spinning){
+    spinAudio.play().catch(()=>{});
+  }
+  unlockAudio();
+}
 
 function showFirebaseError(error){
   console.error('Firebase error:',error);
@@ -112,6 +168,12 @@ room.child('logoutVersion').on('value',snapshot=>{
   if(loggedIn && version!==activeLogoutVersion){
     activeLogoutVersion=version;
     resetAdminSession();
+  }
+},showFirebaseError);
+
+adminSessionRef.on('value',snapshot=>{
+  if(loggedIn && snapshot.val()!==adminSessionToken){
+    resetAdminSession('This admin panel was signed in elsewhere. You have been logged out.');
   }
 },showFirebaseError);
 
@@ -158,7 +220,16 @@ async function login(){
   if(u==='admin' && (p==='admin' || p==='admin123')){
     const errorEl=document.getElementById('err');
     errorEl.textContent='Connecting...';
+    let sessionToken=null;
     try{
+      sessionToken=db.ref().push().key;
+      const claim=await adminSessionRef.transaction(current=>current===null?sessionToken:undefined);
+      if(!claim.committed){
+        errorEl.textContent='Another device is already controlling the admin panel. Try again after it logs out.';
+        return;
+      }
+      adminSessionToken=sessionToken;
+      await adminSessionRef.onDisconnect().remove();
       const snapshot=await room.once('value');
       const data=snapshot.val()||{};
       history=normalizeHistory(data.history);
@@ -180,6 +251,15 @@ async function login(){
       startCountdown(deadline);
     }catch(error){
       console.error('Firebase login/read error:',error);
+      if(sessionToken && adminSessionToken===sessionToken){
+        try{
+          await adminSessionRef.onDisconnect().cancel();
+          await adminSessionRef.transaction(current=>current===sessionToken?null:undefined);
+        }catch(cleanupError){
+          console.error('Could not release the admin session after login failed:',cleanupError);
+        }
+        adminSessionToken=null;
+      }
       errorEl.textContent='Could not connect to online game. Check Firebase database rules.';
     }
   } else {
@@ -187,8 +267,9 @@ async function login(){
   }
 }
 
-function resetAdminSession(){
+function resetAdminSession(message=''){
   loggedIn=false;
+  adminSessionToken=null;
   spinning=false;
   forced=null;
   rotation=0;
@@ -210,27 +291,39 @@ function resetAdminSession(){
   document.getElementById('info').textContent='Next spin: RANDOM';
   document.getElementById('gameScreen').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
-  document.getElementById('err').textContent='';
+  document.getElementById('err').textContent=message;
   document.getElementById('user').value='';
   document.getElementById('pass').value='';
 }
 
 async function logout(){
   if(spinning){ alert('Wait for the spin to finish!'); return; }
+  const sessionToken=adminSessionToken;
   try{
-    const result=await room.transaction(current=>{
-      const data=current||{};
-      return {
-        ...data,
-        state:'ended',
-        nextSpinAt:null,
-        winner:'-',
-        history:[],
-        logoutVersion:(Number(data.logoutVersion)||0)+1
-      };
+    const snapshot=await adminSessionRef.once('value');
+    if(snapshot.val()!==sessionToken){
+      resetAdminSession('This admin session is no longer active.');
+      return;
+    }
+    await room.update({
+      state:'ended',
+      nextSpinAt:null,
+      winner:'-',
+      history:[],
+      logoutVersion:activeLogoutVersion+1
     });
-    if(!result.committed) throw new Error('Could not update the shared admin logout state.');
+    await adminSessionRef.onDisconnect().cancel();
+    const released=await adminSessionRef.transaction(current=>current===sessionToken?null:undefined);
+    if(!released.committed){
+      resetAdminSession('This admin session is no longer active.');
+      return;
+    }
   }catch(error){
+    try{
+      if(sessionToken) await adminSessionRef.onDisconnect().remove();
+    }catch(restoreError){
+      console.error('Could not restore admin disconnect cleanup:',restoreError);
+    }
     showFirebaseError(error);
     return;
   }
@@ -238,7 +331,7 @@ async function logout(){
 }
 
 async function spin(){
-  if(spinning) return;
+  if(spinning || !loggedIn || !adminSessionToken) return;
   spinning=true;
   if(countdownInterval) clearInterval(countdownInterval);
   countdownInterval=null;
@@ -247,24 +340,29 @@ async function spin(){
   document.getElementById('winner').textContent='-';
 
   const result=(forced!==null)?forced:Math.floor(Math.random()*10);
+  const spinId=Date.now();
   forced=null;
   clearForcedSelection();
   document.getElementById('info').textContent='Next spin: RANDOM';
+
+  try{
+    const snapshot=await adminSessionRef.once('value');
+    if(snapshot.val()!==adminSessionToken){
+      resetAdminSession('This admin session is no longer active.');
+      return;
+    }
+    await room.update({state:'spin',result,spinId,nextSpinAt:null});
+  }catch(error){
+    spinning=false;
+    document.getElementById('spinBtn').disabled=false;
+    showFirebaseError(error);
+    return;
+  }
 
   const idx=order.indexOf(result);
   const neededMod=(360-(idx*36))%360;
   const currentMod=((rotation%360)+360)%360;
   const add=(neededMod-currentMod+360)%360;
-  const spinId=Date.now();
-  try{
-    await room.update({state:'spin',result,spinId,nextSpinAt:null});
-  }catch(error){
-    spinning=false;
-    document.getElementById('spinBtn').disabled=false;
-    document.getElementById('timer').textContent='--:--';
-    showFirebaseError(error);
-    return;
-  }
 
   // Play audio in admin panel synchronized with spin
   try{
@@ -279,27 +377,39 @@ async function spin(){
   wheelEl.style.transition=`transform ${SPIN_DURATION_SEC}s cubic-bezier(0.15, 0.85, 0.2, 1)`;
   wheelEl.style.transform=`rotate(${rotation}deg)`;
 
-  spinTimeout=setTimeout(()=>{
+  spinTimeout=setTimeout(async()=>{
     spinTimeout=null;
-    document.getElementById('winner').textContent=result;
-    history.unshift(result);
-    if(history.length>10) history.pop();
-    document.getElementById('last10').textContent=history.join(' ');
+    const updatedHistory=[result,...history].slice(0,10);
     const deadline=Date.now()+60000;
-    room.update({
-      state:'running',
-      result,
-      winner:String(result),
-      history,
-      spinId,
-      nextSpinAt:deadline
-    }).then(()=>{
-      if(loggedIn) startCountdown(deadline);
-    }).catch(showFirebaseError);
+    try{
+      const snapshot=await adminSessionRef.once('value');
+      if(snapshot.val()!==adminSessionToken){
+        resetAdminSession('This admin session is no longer active.');
+        return;
+      }
+      await room.update({
+        state:'running',
+        result,
+        winner:String(result),
+        history:updatedHistory,
+        spinId,
+        nextSpinAt:deadline
+      });
+    }catch(error){
+      spinning=false;
+      document.getElementById('spinBtn').disabled=false;
+      showFirebaseError(error);
+      return;
+    }
+    document.getElementById('winner').textContent=result;
+    history=updatedHistory;
+    document.getElementById('last10').textContent=history.join(' ');
     spinning=false;
     document.getElementById('spinBtn').disabled=false;
+    if(loggedIn) startCountdown(deadline);
   }, SPIN_DURATION_MS);
 }
+updateAdminSoundButton();
 </script>
 <script src="scene.js"></script>
 </body>
