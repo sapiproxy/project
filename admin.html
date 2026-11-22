@@ -96,12 +96,18 @@ for(let n=0;n<=9;n++){
   b.type='button';
   b.textContent=n;
   b.setAttribute('aria-pressed','false');
-  b.onclick=()=>{
+  b.onclick=async()=>{
+    if(!loggedIn || !adminSessionToken) return;
     clearForcedSelection();
     forced=n;
     b.classList.add('selected');
     b.setAttribute('aria-pressed','true');
     document.getElementById('info').textContent=`✔ Next spin will land on ${n}`;
+    try{
+      await room.update({forcedResult:n});
+    }catch(error){
+      showFirebaseError(error);
+    }
   };
   numsEl.appendChild(b);
 }
@@ -240,7 +246,8 @@ async function login(){
         winner:data.winner||'-',
         history,
         nextSpinAt:deadline,
-        spinId:Number(data.spinId)||0
+        spinId:Number(data.spinId)||0,
+        forcedResult:null
       });
       loggedIn=true;
       document.getElementById('last10').textContent=history.join(' ')||'- - - - - - - - - -';
@@ -310,7 +317,8 @@ async function logout(){
       nextSpinAt:null,
       winner:'-',
       history:[],
-      logoutVersion:activeLogoutVersion+1
+      logoutVersion:activeLogoutVersion+1,
+      forcedResult:null
     });
     await adminSessionRef.onDisconnect().cancel();
     const released=await adminSessionRef.transaction(current=>current===sessionToken?null:undefined);
@@ -351,7 +359,7 @@ async function spin(){
       resetAdminSession('This admin session is no longer active.');
       return;
     }
-    await room.update({state:'spin',result,spinId,nextSpinAt:null});
+    await room.update({state:'spin',result,spinId,nextSpinAt:null,forcedResult:null});
   }catch(error){
     spinning=false;
     document.getElementById('spinBtn').disabled=false;
