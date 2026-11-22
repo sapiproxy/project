@@ -76,7 +76,8 @@ for(let n=0;n<=9;n++){
 }
 
 let loggedIn=false, spinning=false, rotation=0, forced=null;
-let countdownInterval=null, nextSpinAt=0;
+let countdownInterval=null, nextSpinAt=0, spinTimeout=null;
+let activeLogoutVersion=0;
 let history=[];
 
 const SPIN_DURATION_SEC=16.2;
@@ -105,6 +106,14 @@ function showFirebaseError(error){
   console.error('Firebase error:',error);
   document.getElementById('info').textContent='Online connection error. Check database access.';
 }
+
+room.child('logoutVersion').on('value',snapshot=>{
+  const version=Number(snapshot.val())||0;
+  if(loggedIn && version!==activeLogoutVersion){
+    activeLogoutVersion=version;
+    resetAdminSession();
+  }
+},showFirebaseError);
 
 function clearForcedSelection(){
   const selectedButton=numsEl.querySelector('.selected');
@@ -153,6 +162,7 @@ async function login(){
       const snapshot=await room.once('value');
       const data=snapshot.val()||{};
       history=normalizeHistory(data.history);
+      activeLogoutVersion=Number(data.logoutVersion)||0;
       const deadline=Date.now()+60000;
       await room.update({
         state:'running',
@@ -177,27 +187,24 @@ async function login(){
   }
 }
 
-async function logout(){
-  if(spinning){ alert('Wait for the spin to finish!'); return; }
+function resetAdminSession(){
+  loggedIn=false;
+  spinning=false;
+  forced=null;
+  rotation=0;
+  history=[];
   if(countdownInterval) clearInterval(countdownInterval);
   countdownInterval=null;
   nextSpinAt=0;
-  document.getElementById('timer').textContent='--:--';
-  if(spinAudio){
-    spinAudio.pause();
-    spinAudio.currentTime=0;
-  }
-  try{
-    await room.update({state:'ended',nextSpinAt:null,winner:'-',history:[]});
-  }catch(error){
-    showFirebaseError(error);
-    return;
-  }
-  loggedIn=false;
-  forced=null;
+  if(spinTimeout) clearTimeout(spinTimeout);
+  spinTimeout=null;
+  spinAudio.pause();
+  spinAudio.currentTime=0;
+  wheelEl.style.transition='none';
+  wheelEl.style.transform='rotate(0deg)';
   clearForcedSelection();
-  history=[];
-  rotation=0;
+  document.getElementById('spinBtn').disabled=false;
+  document.getElementById('timer').textContent='--:--';
   document.getElementById('last10').textContent='- - - - - - - - - -';
   document.getElementById('winner').textContent='-';
   document.getElementById('info').textContent='Next spin: RANDOM';
@@ -206,6 +213,28 @@ async function logout(){
   document.getElementById('err').textContent='';
   document.getElementById('user').value='';
   document.getElementById('pass').value='';
+}
+
+async function logout(){
+  if(spinning){ alert('Wait for the spin to finish!'); return; }
+  try{
+    const result=await room.transaction(current=>{
+      const data=current||{};
+      return {
+        ...data,
+        state:'ended',
+        nextSpinAt:null,
+        winner:'-',
+        history:[],
+        logoutVersion:(Number(data.logoutVersion)||0)+1
+      };
+    });
+    if(!result.committed) throw new Error('Could not update the shared admin logout state.');
+  }catch(error){
+    showFirebaseError(error);
+    return;
+  }
+  resetAdminSession();
 }
 
 async function spin(){
@@ -250,7 +279,8 @@ async function spin(){
   wheelEl.style.transition=`transform ${SPIN_DURATION_SEC}s cubic-bezier(0.15, 0.85, 0.2, 1)`;
   wheelEl.style.transform=`rotate(${rotation}deg)`;
 
-  setTimeout(()=>{
+  spinTimeout=setTimeout(()=>{
+    spinTimeout=null;
     document.getElementById('winner').textContent=result;
     history.unshift(result);
     if(history.length>10) history.pop();
@@ -264,7 +294,7 @@ async function spin(){
       spinId,
       nextSpinAt:deadline
     }).then(()=>{
-      startCountdown(deadline);
+      if(loggedIn) startCountdown(deadline);
     }).catch(showFirebaseError);
     spinning=false;
     document.getElementById('spinBtn').disabled=false;
